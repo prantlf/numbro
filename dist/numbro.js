@@ -17,6 +17,7 @@
         VERSION = '1.5.1',
         // internal storage for language config files
         languages = {},
+        // global configuration, overridable in Numbro instances
         currentLanguage = 'en-US',
         zeroFormat = null,
         defaultFormat = '0,0',
@@ -31,8 +32,11 @@
 
 
     // Numbro prototype object
-    function Numbro(number) {
+    //   number: number to initialize the numbro instance with
+    //   config: optional overrides for global configuration variables
+    function Numbro(number, config) {
         this._value = number;
+        this._config = config || {};
     }
 
     /**
@@ -74,7 +78,7 @@
         } else if (format.indexOf(':') > -1) { // time
             output = formatTime(n, format);
         } else { // plain ol' numbers or bytes
-            output = formatNumber(n._value, format, roundingFunction);
+            output = formatNumber(n, n._value, format, roundingFunction);
         }
 
         // return string
@@ -84,6 +88,8 @@
     // revert to number
     function unformatNumbro(n, string) {
         var stringOriginal = string,
+            languageConfig = languages[n._config.currentLanguage || currentLanguage],
+            currentZeroFormat,
             thousandRegExp,
             millionRegExp,
             billionRegExp,
@@ -96,22 +102,23 @@
         if (string.indexOf(':') > -1) {
             n._value = unformatTime(string);
         } else {
-            if (string === zeroFormat) {
+            currentZeroFormat = n._config.zeroFormat || zeroFormat;
+            if (string === currentZeroFormat) {
                 n._value = 0;
             } else {
-                if (languages[currentLanguage].delimiters.decimal !== '.') {
-                    string = string.replace(/\./g, '').replace(languages[currentLanguage].delimiters.decimal, '.');
+                if (languageConfig.delimiters.decimal !== '.') {
+                    string = string.replace(/\./g, '').replace(languageConfig.delimiters.decimal, '.');
                 }
 
                 // see if abbreviations are there so that we can multiply to the correct number
-                thousandRegExp = new RegExp('[^a-zA-Z]' + languages[currentLanguage].abbreviations.thousand +
-                    '(?:\\)|(\\' + languages[currentLanguage].currency.symbol + ')?(?:\\))?)?$');
-                millionRegExp = new RegExp('[^a-zA-Z]' + languages[currentLanguage].abbreviations.million +
-                    '(?:\\)|(\\' + languages[currentLanguage].currency.symbol + ')?(?:\\))?)?$');
-                billionRegExp = new RegExp('[^a-zA-Z]' + languages[currentLanguage].abbreviations.billion +
-                    '(?:\\)|(\\' + languages[currentLanguage].currency.symbol + ')?(?:\\))?)?$');
-                trillionRegExp = new RegExp('[^a-zA-Z]' + languages[currentLanguage].abbreviations.trillion +
-                    '(?:\\)|(\\' + languages[currentLanguage].currency.symbol + ')?(?:\\))?)?$');
+                thousandRegExp = new RegExp('[^a-zA-Z]' + languageConfig.abbreviations.thousand +
+                    '(?:\\)|(\\' + languageConfig.currency.symbol + ')?(?:\\))?)?$');
+                millionRegExp = new RegExp('[^a-zA-Z]' + languageConfig.abbreviations.million +
+                    '(?:\\)|(\\' + languageConfig.currency.symbol + ')?(?:\\))?)?$');
+                billionRegExp = new RegExp('[^a-zA-Z]' + languageConfig.abbreviations.billion +
+                    '(?:\\)|(\\' + languageConfig.currency.symbol + ')?(?:\\))?)?$');
+                trillionRegExp = new RegExp('[^a-zA-Z]' + languageConfig.abbreviations.trillion +
+                    '(?:\\)|(\\' + languageConfig.currency.symbol + ')?(?:\\))?)?$');
 
                 // see if bytes are there so that we can multiply to the correct number
                 for (power = 0; power <= binarySuffixes.length && !bytesMultiplier; power++) {
@@ -142,6 +149,7 @@
 
     function formatCurrency(n, originalFormat, roundingFunction) {
         var format = originalFormat,
+            languageConfig = languages[n._config.currentLanguage || currentLanguage],
             symbolIndex = format.indexOf('$'),
             openParenIndex = format.indexOf('('),
             plusSignIndex = format.indexOf('+'),
@@ -153,12 +161,12 @@
 
         if(format.indexOf('$') === -1){
             // Use defaults instead of the format provided
-            if (languages[currentLanguage].currency.position === 'infix') {
-                decimalSeparator = languages[currentLanguage].currency.symbol;
-                if (languages[currentLanguage].currency.spaceSeparated) {
+            if (languageConfig.currency.position === 'infix') {
+                decimalSeparator = languageConfig.currency.symbol;
+                if (languageConfig.currency.spaceSeparated) {
                     decimalSeparator = ' ' + decimalSeparator + ' ';
                 }
-            } else if (languages[currentLanguage].currency.spaceSeparated) {
+            } else if (languageConfig.currency.spaceSeparated) {
                 space = ' ';
             }
         } else {
@@ -175,18 +183,18 @@
         }
 
         // Format The Number
-        output = formatNumber(n._value, format, roundingFunction, decimalSeparator);
+        output = formatNumber(n, n._value, format, roundingFunction, decimalSeparator);
 
         if (originalFormat.indexOf('$') === -1) {
             // Use defaults instead of the format provided
-            switch (languages[currentLanguage].currency.position) {
+            switch (languageConfig.currency.position) {
                 case 'postfix':
                     if (output.indexOf(')') > -1) {
                         output = output.split('');
-                        output.splice(-1, 0, space + languages[currentLanguage].currency.symbol);
+                        output.splice(-1, 0, space + languageConfig.currency.symbol);
                         output = output.join('');
                     } else {
-                        output = output + space + languages[currentLanguage].currency.symbol;
+                        output = output + space + languageConfig.currency.symbol;
                     }
                     break;
                 case 'infix':
@@ -196,10 +204,10 @@
                         output = output.split('');
                         spliceIndex = Math.max(openParenIndex, minusSignIndex) + 1;
 
-                        output.splice(spliceIndex, 0, languages[currentLanguage].currency.symbol + space);
+                        output.splice(spliceIndex, 0, languageConfig.currency.symbol + space);
                         output = output.join('');
                     } else {
-                        output = languages[currentLanguage].currency.symbol + space + output;
+                        output = languageConfig.currency.symbol + space + output;
                     }
                     break;
                 default:
@@ -215,18 +223,18 @@
                         // the symbol appears before the "(", "+" or "-"
                         spliceIndex = 0;
                     }
-                    output.splice(spliceIndex, 0, languages[currentLanguage].currency.symbol + space);
+                    output.splice(spliceIndex, 0, languageConfig.currency.symbol + space);
                     output = output.join('');
                 } else {
-                    output = languages[currentLanguage].currency.symbol + space + output;
+                    output = languageConfig.currency.symbol + space + output;
                 }
             } else {
                 if (output.indexOf(')') > -1) {
                     output = output.split('');
-                    output.splice(-1, 0, space + languages[currentLanguage].currency.symbol);
+                    output.splice(-1, 0, space + languageConfig.currency.symbol);
                     output = output.join('');
                 } else {
-                    output = output + space + languages[currentLanguage].currency.symbol;
+                    output = output + space + languageConfig.currency.symbol;
                 }
             }
         }
@@ -247,7 +255,7 @@
             format = format.replace('%', '');
         }
 
-        output = formatNumber(value, format, roundingFunction);
+        output = formatNumber(n, value, format, roundingFunction);
 
         if (output.indexOf(')') > -1) {
             output = output.split('');
@@ -289,7 +297,7 @@
         return Number(seconds);
     }
 
-    function formatNumber (value, format, roundingFunction, sep) {
+    function formatNumber(n, value, format, roundingFunction, sep) {
         var negP = false,
             signed = false,
             optDec = false,
@@ -303,6 +311,8 @@
             bytes = '',
             ord = '',
             abs = Math.abs(value),
+            languageConfig = languages[n._config.currentLanguage || currentLanguage],
+            currentZeroFormat = n._config.zeroFormat || zeroFormat,
             binarySuffixes = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'],
             decimalSuffixes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'],
             min,
@@ -326,8 +336,8 @@
             paren = '';
 
         // check if number is zero and a custom zero format has been set
-        if (value === 0 && zeroFormat !== null) {
-            return zeroFormat;
+        if (value === 0 && currentZeroFormat !== null) {
+            return currentZeroFormat;
         } else if (!isFinite(value)) {
             return '' + value;
         } else {
@@ -392,19 +402,19 @@
                 if (Math.floor(Math.log(Math.abs(value)) / Math.LN10) + 1 !== intPrecision){
                     if (abs >= Math.pow(10, 12) && !abbrForce || abbrT) {
                         // trillion
-                        abbr = abbr + languages[currentLanguage].abbreviations.trillion;
+                        abbr = abbr + languageConfig.abbreviations.trillion;
                         value = value / Math.pow(10, 12);
                     } else if (abs < Math.pow(10, 12) && abs >= Math.pow(10, 9) && !abbrForce || abbrB) {
                         // billion
-                        abbr = abbr + languages[currentLanguage].abbreviations.billion;
+                        abbr = abbr + languageConfig.abbreviations.billion;
                         value = value / Math.pow(10, 9);
                     } else if (abs < Math.pow(10, 9) && abs >= Math.pow(10, 6) && !abbrForce || abbrM) {
                         // million
-                        abbr = abbr + languages[currentLanguage].abbreviations.million;
+                        abbr = abbr + languageConfig.abbreviations.million;
                         value = value / Math.pow(10, 6);
                     } else if (abs < Math.pow(10, 6) && abs >= Math.pow(10, 3) && !abbrForce || abbrK) {
                         // thousand
-                        abbr = abbr + languages[currentLanguage].abbreviations.thousand;
+                        abbr = abbr + languageConfig.abbreviations.thousand;
                         value = value / Math.pow(10, 3);
                     }
                 }
@@ -468,8 +478,8 @@
                     format = format.replace('o', '');
                 }
 
-                if (languages[currentLanguage].ordinal){
-                    ord = ord + languages[currentLanguage].ordinal(value);
+                if (languageConfig.ordinal){
+                    ord = ord + languageConfig.ordinal(value);
                 }
             }
 
@@ -495,7 +505,7 @@
                 w = d.split('.')[0];
 
                 if (d.split('.')[1].length) {
-                    prefix = sep ? abbr + sep : languages[currentLanguage].delimiters.decimal;
+                    prefix = sep ? abbr + sep : languageConfig.delimiters.decimal;
                     d = prefix + d.split('.')[1];
                 } else {
                     d = '';
@@ -516,7 +526,7 @@
 
             if (thousands > -1) {
                 w = w.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1' +
-                    languages[currentLanguage].delimiters.thousands);
+                    languageConfig.delimiters.thousands);
             }
 
             if (format.indexOf('.') === 0) {
@@ -547,15 +557,22 @@
     ************************************/
 
     numbro = function(input) {
+        var number, instance;
         if (numbro.isNumbro(input)) {
-            input = input.value();
-        } else if (input === 0 || typeof input === 'undefined') {
-            input = 0;
-        } else if (!Number(input)) {
-            input = numbro.fn.unformat(input);
+            return new Numbro(input.value(), input._config);
         }
-
-        return new Numbro(Number(input));
+        if (input === 0 || typeof input === 'undefined') {
+            return new Numbro(0);
+        }
+        number = Number(input);
+        if (isNaN(number)) {
+            // Do not call unformat on the prototype; instance
+            // configuration may be accessed
+            instance = new Numbro();
+            instance.set(instance.unformat(input));
+            return instance;
+        }
+        return new Numbro(number);
     };
 
     // version number
@@ -599,18 +616,8 @@
     // the language does not exist. If no fallback language is provided,
     // it fallbacks to english.
     numbro.setLanguage = function(newLanguage, fallbackLanguage) {
-        var key = newLanguage,
-            prefix = newLanguage.split('-')[0],
-            matchingLanguage = null;
-        if (!languages[key]) {
-            Object.keys(languages).forEach(function(language) {
-                if (!matchingLanguage && language.split('-')[0] === prefix){
-                    matchingLanguage = language;
-                }
-            });
-            key = matchingLanguage || fallbackLanguage || 'en-US';
-        }
-        numbro.language(key);
+        newLanguage = getClosestLanguage(newLanguage, fallbackLanguage);
+        numbro.language(newLanguage);
     };
 
     // This function provides access to the loaded language data.  If
@@ -775,6 +782,25 @@
         Helpers
     ************************************/
 
+    // Checks if the preferred language exists and return is, if it does;
+    // if that language does not exist, it continues looking for a similar
+    // language by the language prefix.  If nothing is found, it returns
+    // the fallback language, or English, if no fallback is provided.
+    function getClosestLanguage(preferredLanguage, fallbackLanguage) {
+        var prefix, matchingLanguage;
+        if (!languages[preferredLanguage]) {
+            prefix = preferredLanguage.split('-')[0];
+            Object.keys(languages).some(function(language) {
+                if (language.split('-')[0] === prefix){
+                    matchingLanguage = language;
+                    return true;
+                }
+            });
+            preferredLanguage = matchingLanguage || fallbackLanguage || 'en-US';
+        }
+        return preferredLanguage;
+    }
+
     function loadLanguage(key, values) {
         languages[key] = values;
     }
@@ -874,24 +900,28 @@
         },
 
         format: function(inputString, roundingFunction) {
+            var currentFormat = this._config.defaultFormat || defaultFormat;
             return formatNumbro(this,
-                inputString ? inputString : defaultFormat,
+                inputString ? inputString : currentFormat,
                 (roundingFunction !== undefined) ? roundingFunction : Math.round
             );
         },
 
         formatCurrency: function(inputString, roundingFunction) {
+            var currentFormat = this._config.defaultCurrencyFormat || defaultCurrencyFormat;
             return formatCurrency(this,
-                inputString ? inputString : defaultCurrencyFormat,
+                inputString ? inputString : currentFormat,
                 (roundingFunction !== undefined) ? roundingFunction : Math.round
             );
         },
 
         unformat: function(inputString) {
+            var currentFormat;
             if (Object.prototype.toString.call(inputString) === '[object Number]') {
                 return inputString;
             }
-            return unformatNumbro(this, inputString ? inputString : defaultFormat);
+            currentFormat = this._config.defaultFormat || defaultFormat;
+            return unformatNumbro(this, inputString ? inputString : currentFormat);
         },
 
         value: function() {
@@ -950,6 +980,58 @@
 
         difference: function(value) {
             return Math.abs(numbro(this._value).subtract(value).value());
+        },
+
+        // Gets the language set for this instance, or the global language,
+        // if theis instance has no explicitly assigned langugae; if the key
+        // argumenmt is passed in, it set the instance language
+        language: function(key) {
+            if (!key) {
+                return this._config.currentLanguage || currentLanguage;
+            }
+
+            var language = languages[key];
+            if (!language) {
+                throw new Error('Unknown language : ' + key);
+            }
+            this._config.currentLanguage = key;
+            var defaults = language.defaults;
+            if (defaults) {
+                if (defaults.format) {
+                    this.defaultFormat(defaults.format);
+                }
+                if (defaults.currencyFormat) {
+                    this.defaultCurrencyFormat(defaults.currencyFormat);
+                }
+            }
+
+            return this;
+        },
+
+        // Sets the language for this instance; if the language does not exist,
+        // it tries to find a similar language by the language prefix only, then
+        // it sets the fallback language or English, if no fallback is provided
+        setLanguage: function(newLanguage, fallbackLanguage) {
+            newLanguage = getClosestLanguage(newLanguage, fallbackLanguage);
+            return this.language(newLanguage);
+        },
+
+        // Sets the zero format for this instance
+        zeroFormat: function(format) {
+            this._config.zeroFormat = typeof(format) === 'string' ? format : null;
+            return this;
+        },
+
+        // Sets the default plain format for this instance
+        defaultFormat: function(format) {
+            this._config.defaultFormat = typeof(format) === 'string' ? format : '0.0';
+            return this;
+        },
+
+        // Sets the default currency format for this instance
+        defaultCurrencyFormat: function (format) {
+            this._config.defaultCurrencyFormat = typeof(format) === 'string' ? format : '0$';
+            return this;
         }
 
     };

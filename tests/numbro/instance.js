@@ -1,43 +1,11 @@
 'use strict';
 
 var numbro = require('../../numbro');
+require('./test-locale');
 
-// Check that changes to instance settings apply to the particular instance
-// and do not modify the defaults
+// Check that changes to instance configuration apply to the particular
+// instance and do not modify the defaults
 exports.instance = {
-
-    // Prepare the test environment
-    setUp: function (callback) {
-        // Register a testing language
-        numbro.language('test-TEST', {
-            delimiters: {
-                thousands: ',',
-                decimal: '.'
-            },
-            abbreviations: {
-                thousand: 'k',
-                million: 'm',
-                billion: 'b',
-                trillion: 't'
-            },
-            ordinal: function(number) {
-                var b = number % 10;
-                return (~~(number % 100 / 10) === 1) ? 'th' :
-                    (b === 1) ? 'st' :
-                    (b === 2) ? 'nd' :
-                    (b === 3) ? 'rd' : 'th';
-            },
-            currency: {
-                symbol: '$',
-                position: 'prefix'
-            },
-            defaults: {
-                currencyFormat: ',0000 a'
-            }
-        });
-
-        callback();
-    },
 
     // Check that the instance language method applies only to the instance
     language: function (test) {
@@ -45,11 +13,11 @@ exports.instance = {
 
         var n = numbro();
         n.language('test-TEST');
-        test.strictEqual(n.language(), 'test-TEST', 'local language');
+        test.strictEqual(n.language(), 'test-TEST', 'local');
         n.setLanguage('test');
-        test.strictEqual(n.language(), 'test-TEST', 'local language');
+        test.strictEqual(n.language(), 'test-TEST', 'local prefix');
 
-        test.strictEqual(numbro.language(), 'en-US', 'global language');
+        test.strictEqual(numbro.language(), 'en-US', 'global');
 
         test.done();
     },

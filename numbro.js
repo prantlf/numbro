@@ -35,8 +35,17 @@
     //   number: number to initialize the numbro instance with
     //   config: optional overrides for global configuration variables
     function Numbro(number, config) {
+        var key;
         this._value = number;
-        this._config = config || {};
+        this._config = {};
+        // clone the configuration not to modify the source object
+        if (config) {
+            for (key in config) {
+                if (Object.hasOwnProperty.call(config, key)) {
+                    this._config[key] = config[key];
+                }
+            }
+        }
     }
 
     /**
@@ -556,23 +565,104 @@
         Top Level Functions
     ************************************/
 
+    // Clones the specified or the current global configuration to a new
+    // numbro factory function, which will be configurable separately
+    function cloneNumbro(config) {
+        if (!config) {
+            config = {};
+        }
+        // Configuration of the numro factory function clone
+        var _config = {
+            currentLanguage: config.currentLanguage || currentLanguage,
+            zeroFormat: config.zeroFormat || zeroFormat,
+            defaultFormat: config.defaultFormat || defaultFormat,
+            defaultCurrencyFormat: config.defaultCurrencyFormat || defaultCurrencyFormat
+        };
+
+        // Factory function clone for numbro
+        var numbroClone = function(input) {
+            return createNumbro(input, _config);
+        };
+
+        // Clones the numbro factory function with its current configuration
+        numbroClone.clone = function () {
+            return cloneNumbro(_config);
+        };
+
+        // version number
+        numbroClone.version = numbro.version;
+
+        // compare numbro object
+        numbroClone.isNumbro = numbro.isNumbro;
+
+        // This function will load languages and then set the global language.  If
+        // no arguments are passed in, it will simply return the current global
+        // language key.
+        numbroClone.language = function(key, values) {
+            var language;
+            if (!key) {
+                return _config.currentLanguage;
+            }
+
+            if (key && !values) {
+                language = languages[key];
+                if (!language) {
+                    throw new Error('Unknown language : ' + key);
+                }
+                _config.currentLanguage = key;
+                setDefaultsFromLanguage(numbroClone, language);
+            }
+
+            if (values || !languages[key]) {
+                loadLanguage(key, values);
+            }
+
+            return numbroClone;
+        };
+
+        // This function allow the user to set a new language with a fallback if
+        // the language does not exist. If no fallback language is provided,
+        // it fallbacks to english.
+        numbroClone.setLanguage = numbro.setLanguage;
+
+        // This function provides access to the loaded language data.  If
+        // no arguments are passed in, it will simply return the current
+        // global language object.
+        numbroClone.languageData = function(key) {
+            if (!key) {
+                return languages[_config.currentLanguage];
+            }
+            return numbro.languageData(key);
+        };
+
+        numbroClone.languages = numbro.languages;
+
+        numbroClone.zeroFormat = function(format) {
+            _config.zeroFormat = typeof(format) === 'string' ? format : null;
+        };
+
+        numbroClone.defaultFormat = function(format) {
+            _config.defaultFormat = typeof(format) === 'string' ? format : '0.0';
+        };
+
+        numbroClone.defaultCurrencyFormat = function (format) {
+            _config.defaultCurrencyFormat = typeof(format) === 'string' ? format : '0$';
+        };
+
+        numbroClone.validate = numbro.validate;
+
+        return numbroClone;
+    }
+
+    // Factory function for numbro
     numbro = function(input) {
-        var number, instance;
-        if (numbro.isNumbro(input)) {
-            return new Numbro(input.value(), input._config);
-        }
-        if (input === 0 || typeof input === 'undefined') {
-            return new Numbro(0);
-        }
-        number = Number(input);
-        if (isNaN(number)) {
-            // Do not call unformat on the prototype; instance
-            // configuration may be accessed
-            instance = new Numbro();
-            instance.set(instance.unformat(input));
-            return instance;
-        }
-        return new Numbro(number);
+        return createNumbro(input);
+    };
+
+    // clones the numbro factory function with the current state
+    // of the global configuration
+    numbro.clone = function () {
+        return cloneNumbro();
     };
 
     // version number
@@ -587,22 +677,18 @@
     // no arguments are passed in, it will simply return the current global
     // language key.
     numbro.language = function(key, values) {
+        var language;
         if (!key) {
             return currentLanguage;
         }
 
         if (key && !values) {
-            if (!languages[key]) {
+            language = languages[key];
+            if (!language) {
                 throw new Error('Unknown language : ' + key);
             }
             currentLanguage = key;
-            var defaults = languages[key].defaults;
-            if(defaults && defaults.format){
-                numbro.defaultFormat(defaults.format);
-            }
-            if(defaults && defaults.currencyFormat){
-                numbro.defaultCurrencyFormat(defaults.currencyFormat);
-            }
+            setDefaultsFromLanguage(numbro, language);
         }
 
         if (values || !languages[key]) {
@@ -617,7 +703,7 @@
     // it fallbacks to english.
     numbro.setLanguage = function(newLanguage, fallbackLanguage) {
         newLanguage = getClosestLanguage(newLanguage, fallbackLanguage);
-        numbro.language(newLanguage);
+        return this.language(newLanguage);
     };
 
     // This function provides access to the loaded language data.  If
@@ -718,9 +804,9 @@
         //get the decimal and thousands separator from numbro.languageData
         try {
             //check if the culture is understood by numbro. if not, default it to current language
-            languageData = numbro.languageData(culture);
+            languageData = this.languageData(culture);
         } catch (e) {
-            languageData = numbro.languageData(numbro.language());
+            languageData = this.languageData(this.language());
         }
 
         //setup the delimiters and currency symbol based on culture/language
@@ -781,6 +867,39 @@
     /************************************
         Helpers
     ************************************/
+
+    // Creates a new numbro instance
+    function createNumbro(input, config) {
+        var number, instance;
+        if (numbro.isNumbro(input)) {
+            return new Numbro(input.value(), input._config);
+        }
+        if (input === 0 || typeof input === 'undefined') {
+            return new Numbro(0, config);
+        }
+        number = Number(input);
+        if (isNaN(number)) {
+            // Do not call unformat on the prototype; instance
+            // configuration may be accessed
+            instance = new Numbro(undefined, config);
+            instance.set(instance.unformat(input));
+            return instance;
+        }
+        return new Numbro(number, config);
+    }
+
+    // Propagates language defaults to the caller context
+    function setDefaultsFromLanguage(numbroContext, language) {
+        var defaults = language.defaults;
+        if (defaults) {
+            if (defaults.format) {
+                numbroContext.defaultFormat(defaults.format);
+            }
+            if (defaults.currencyFormat) {
+                numbroContext.defaultCurrencyFormat(defaults.currencyFormat);
+            }
+        }
+    }
 
     // Checks if the preferred language exists and return is, if it does;
     // if that language does not exist, it continues looking for a similar
@@ -995,15 +1114,7 @@
                 throw new Error('Unknown language : ' + key);
             }
             this._config.currentLanguage = key;
-            var defaults = language.defaults;
-            if (defaults) {
-                if (defaults.format) {
-                    this.defaultFormat(defaults.format);
-                }
-                if (defaults.currencyFormat) {
-                    this.defaultCurrencyFormat(defaults.currencyFormat);
-                }
-            }
+            setDefaultsFromLanguage(this, language);
 
             return this;
         },

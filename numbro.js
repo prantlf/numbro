@@ -24,7 +24,8 @@
         // check for nodeJS
         hasModule = (typeof module !== 'undefined' && module.exports),
         // support noConflict
-        previousNumbro = this.numbro;
+        previousNumbro = this.numbro,
+        self = this;
 
 
     /************************************
@@ -984,7 +985,7 @@
         // it restores the previous global numbro value and return the value set here,
         // so that can be used by a local variable.
         numbro.noConflict = function () {
-            this.numbro = previousNumbro;
+            self.numbro = previousNumbro;
             return numbro;
         };
     }

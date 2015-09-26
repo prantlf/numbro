@@ -124,5 +124,32 @@ exports.misc = {
         test.strictEqual(formatTestVal(), oldCurrencyVal, 'Format uses old currency');
 
         test.done();
+    },
+
+    // Adapted from the noConflict test of Underscore.js; see
+    // https://github.com/jashkenas/underscore/blob/master/test/utility.js#L29
+    noConflict: function(test) {
+        test.expect(2);
+
+        var fs = require('fs'),
+            vm = require('vm'),
+            fileName = __dirname + '/../../numbro.js';
+
+        fs.readFile(fileName, function(error, content) {
+            var sandbox = vm.createScript(
+                    content + 'this.newNumbro = this.numbro.noConflict();',
+                    fileName
+                ),
+                context = {numbro: 'oldValue'};
+
+            sandbox.runInNewContext(context);
+            test.strictEqual(context.numbro, 'oldValue',
+                'restores the previous value');
+            test.strictEqual(context.newNumbro.version, numbro.version,
+                'returns the new numbro object');
+
+            test.done();
+        });
     }
+
 };

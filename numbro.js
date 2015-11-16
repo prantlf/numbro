@@ -1,6 +1,6 @@
 /*!
  * numbro.js
- * version : 1.5.1
+ * version : 1.6.2
  * author : Företagsplatsen AB
  * license : MIT
  * http://www.foretagsplatsen.se
@@ -14,10 +14,12 @@
     ************************************/
 
     var numbro,
-        VERSION = '1.5.1',
-        // internal storage for language config files
-        languages = {},
-        currentLanguage = 'en-US',
+        VERSION = '1.6.2',
+    // internal storage for culture config files
+        cultures = {},
+    // Todo: Remove in 2.0.0
+        languages = cultures,
+        currentCulture = 'en-US',
         zeroFormat = null,
         defaultFormat = '0,0',
         defaultCurrencyFormat = '0$',
@@ -25,8 +27,39 @@
         hasModule = (typeof module !== 'undefined' && module.exports),
         // support noConflict
         previousNumbro = this.numbro,
-        self = this;
-
+        self = this,
+    // default culture
+        enUS = {
+            delimiters: {
+                thousands: ',',
+                decimal: '.'
+            },
+            abbreviations: {
+                thousand: 'k',
+                million: 'm',
+                billion: 'b',
+                trillion: 't'
+            },
+            ordinal: function(number) {
+                var b = number % 10;
+                return (~~(number % 100 / 10) === 1) ? 'th' :
+                    (b === 1) ? 'st' :
+                        (b === 2) ? 'nd' :
+                            (b === 3) ? 'rd' : 'th';
+            },
+            currency: {
+                symbol: '$',
+                position: 'prefix'
+            },
+            defaults: {
+                currencyFormat: ',0000 a'
+            },
+            formats: {
+                fourDigits: '0000 a',
+                fullWithTwoDecimals: '$ ,0.00',
+                fullWithTwoDecimalsNoCurrency: ',0.00'
+            }
+        };
 
     /************************************
         Constructors
@@ -36,6 +69,43 @@
     // Numbro prototype object
     function Numbro(number) {
         this._value = number;
+    }
+
+    function zeroes(count) {
+        var i, ret = '';
+
+        for (i = 0; i < count; i++) {
+            ret += '0';
+        }
+
+        return ret;
+    }
+    /**
+     * Implementation of toFixed() for numbers with exponent > 21
+     *
+     *
+     */
+    function toFixedLarge(value, precision) {
+        var mantissa,
+            beforeDec,
+            afterDec,
+            exponent,
+            str;
+
+        str = value.toString();
+
+        mantissa = str.split('e')[0];
+        exponent  = str.split('e')[1];
+
+        beforeDec = mantissa.split('.')[0];
+        afterDec = mantissa.split('.')[1] || '';
+
+        str = beforeDec + afterDec + zeroes(exponent - afterDec.length);
+        if (precision > 0) {
+            str += '.' + zeroes(precision);
+        }
+
+        return str;
     }
 
     /**
@@ -49,9 +119,15 @@
             optionalsRegExp,
             output;
 
-        //roundingFunction = (roundingFunction !== undefined ? roundingFunction : Math.round);
-        // Multiply up by precision, round accurately, then divide and use native toFixed():
-        output = (roundingFunction(value * power) / power).toFixed(precision);
+        if (value.toFixed(0).search('e') > -1) {
+            // Above 1e21, toFixed returns scientific notation, which
+            // is useless and unexpected
+            output = toFixedLarge(value, precision);
+        }
+        else {
+            // Multiply up by precision, round accurately, then divide and use native toFixed():
+            output = (roundingFunction(value + 'e+' + precision) / power).toFixed(precision);
+        }
 
         if (optionals) {
             optionalsRegExp = new RegExp('0{1,' + optionals + '}$');
@@ -102,19 +178,19 @@
             if (string === zeroFormat) {
                 n._value = 0;
             } else {
-                if (languages[currentLanguage].delimiters.decimal !== '.') {
-                    string = string.replace(/\./g, '').replace(languages[currentLanguage].delimiters.decimal, '.');
+                if (cultures[currentCulture].delimiters.decimal !== '.') {
+                    string = string.replace(/\./g, '').replace(cultures[currentCulture].delimiters.decimal, '.');
                 }
 
                 // see if abbreviations are there so that we can multiply to the correct number
-                thousandRegExp = new RegExp('[^a-zA-Z]' + languages[currentLanguage].abbreviations.thousand +
-                    '(?:\\)|(\\' + languages[currentLanguage].currency.symbol + ')?(?:\\))?)?$');
-                millionRegExp = new RegExp('[^a-zA-Z]' + languages[currentLanguage].abbreviations.million +
-                    '(?:\\)|(\\' + languages[currentLanguage].currency.symbol + ')?(?:\\))?)?$');
-                billionRegExp = new RegExp('[^a-zA-Z]' + languages[currentLanguage].abbreviations.billion +
-                    '(?:\\)|(\\' + languages[currentLanguage].currency.symbol + ')?(?:\\))?)?$');
-                trillionRegExp = new RegExp('[^a-zA-Z]' + languages[currentLanguage].abbreviations.trillion +
-                    '(?:\\)|(\\' + languages[currentLanguage].currency.symbol + ')?(?:\\))?)?$');
+                thousandRegExp = new RegExp('[^a-zA-Z]' + cultures[currentCulture].abbreviations.thousand +
+                    '(?:\\)|(\\' + cultures[currentCulture].currency.symbol + ')?(?:\\))?)?$');
+                millionRegExp = new RegExp('[^a-zA-Z]' + cultures[currentCulture].abbreviations.million +
+                    '(?:\\)|(\\' + cultures[currentCulture].currency.symbol + ')?(?:\\))?)?$');
+                billionRegExp = new RegExp('[^a-zA-Z]' + cultures[currentCulture].abbreviations.billion +
+                    '(?:\\)|(\\' + cultures[currentCulture].currency.symbol + ')?(?:\\))?)?$');
+                trillionRegExp = new RegExp('[^a-zA-Z]' + cultures[currentCulture].abbreviations.trillion +
+                    '(?:\\)|(\\' + cultures[currentCulture].currency.symbol + ')?(?:\\))?)?$');
 
                 // see if bytes are there so that we can multiply to the correct number
                 for (power = 0; power <= binarySuffixes.length && !bytesMultiplier; power++) {
@@ -156,12 +232,12 @@
 
         if(format.indexOf('$') === -1){
             // Use defaults instead of the format provided
-            if (languages[currentLanguage].currency.position === 'infix') {
-                decimalSeparator = languages[currentLanguage].currency.symbol;
-                if (languages[currentLanguage].currency.spaceSeparated) {
+            if (cultures[currentCulture].currency.position === 'infix') {
+                decimalSeparator = cultures[currentCulture].currency.symbol;
+                if (cultures[currentCulture].currency.spaceSeparated) {
                     decimalSeparator = ' ' + decimalSeparator + ' ';
                 }
-            } else if (languages[currentLanguage].currency.spaceSeparated) {
+            } else if (cultures[currentCulture].currency.spaceSeparated) {
                 space = ' ';
             }
         } else {
@@ -182,14 +258,14 @@
 
         if (originalFormat.indexOf('$') === -1) {
             // Use defaults instead of the format provided
-            switch (languages[currentLanguage].currency.position) {
+            switch (cultures[currentCulture].currency.position) {
                 case 'postfix':
                     if (output.indexOf(')') > -1) {
                         output = output.split('');
-                        output.splice(-1, 0, space + languages[currentLanguage].currency.symbol);
+                        output.splice(-1, 0, space + cultures[currentCulture].currency.symbol);
                         output = output.join('');
                     } else {
-                        output = output + space + languages[currentLanguage].currency.symbol;
+                        output = output + space + cultures[currentCulture].currency.symbol;
                     }
                     break;
                 case 'infix':
@@ -199,10 +275,10 @@
                         output = output.split('');
                         spliceIndex = Math.max(openParenIndex, minusSignIndex) + 1;
 
-                        output.splice(spliceIndex, 0, languages[currentLanguage].currency.symbol + space);
+                        output.splice(spliceIndex, 0, cultures[currentCulture].currency.symbol + space);
                         output = output.join('');
                     } else {
-                        output = languages[currentLanguage].currency.symbol + space + output;
+                        output = cultures[currentCulture].currency.symbol + space + output;
                     }
                     break;
                 default:
@@ -218,18 +294,18 @@
                         // the symbol appears before the "(", "+" or "-"
                         spliceIndex = 0;
                     }
-                    output.splice(spliceIndex, 0, languages[currentLanguage].currency.symbol + space);
+                    output.splice(spliceIndex, 0, cultures[currentCulture].currency.symbol + space);
                     output = output.join('');
                 } else {
-                    output = languages[currentLanguage].currency.symbol + space + output;
+                    output = cultures[currentCulture].currency.symbol + space + output;
                 }
             } else {
                 if (output.indexOf(')') > -1) {
                     output = output.split('');
-                    output.splice(-1, 0, space + languages[currentLanguage].currency.symbol);
+                    output.splice(-1, 0, space + cultures[currentCulture].currency.symbol);
                     output = output.join('');
                 } else {
-                    output = output + space + languages[currentLanguage].currency.symbol;
+                    output = output + space + cultures[currentCulture].currency.symbol;
                 }
             }
         }
@@ -319,230 +395,274 @@
             intPrecision,
             precision,
             prefix,
+            postfix,
             thousands,
             d = '',
             forcedNeg = false,
             neg = false,
-            indexOpenP = -1,
+            indexOpenP,
             size,
-            indexMinus = -1,
-            paren = '';
+            indexMinus,
+            paren = '',
+            minlen;
 
         // check if number is zero and a custom zero format has been set
         if (value === 0 && zeroFormat !== null) {
             return zeroFormat;
-        } else if (!isFinite(value)) {
+        }
+
+        if (!isFinite(value)) {
             return '' + value;
+        }
+
+        if (format.indexOf('{') === 0) {
+            var end = format.indexOf('}');
+            if (end === -1) {
+                throw Error('Format should also contain a "}"');
+            }
+            prefix = format.slice(1, end);
+            format = format.slice(end + 1);
         } else {
-            // see if we should use parentheses for negative number or if we should prefix with a sign
-            // if both are present we default to parentheses
-            if(format.indexOf('-') !== -1){
-                forcedNeg = true;
+            prefix = '';
+        }
+
+        if (format.indexOf('}') === format.length - 1) {
+            var start = format.indexOf('{');
+            if (start === -1) {
+                throw Error('Format should also contain a "{"');
             }
-            if (format.indexOf('(') > -1) {
-                negP = true;
-                format = format.slice(1, -1);
-            } else if (format.indexOf('+') > -1) {
-                signed = true;
-                format = format.replace(/\+/g, '');
-            }
+            postfix = format.slice(start + 1, -1);
+            format = format.slice(0, start + 1);
+        } else {
+            postfix = '';
+        }
 
-            // see if abbreviation is wanted
-            if (format.indexOf('a') > -1) {
-                intPrecision = format.split('.')[0].match(/[0-9]+/g) || ['0'];
-                intPrecision = parseInt(intPrecision[0], 10);
+        // check for min length
+        var info;
+        if (format.indexOf('.') === -1) {
+            info = format.match(/([0-9]+).*/);
+        } else {
+            info = format.match(/([0-9]+)\..*/);
+        }
+        minlen = info === null ? -1 : info[1].length;
 
-                // check if abbreviation is specified
-                abbrK = format.indexOf('aK') >= 0;
-                abbrM = format.indexOf('aM') >= 0;
-                abbrB = format.indexOf('aB') >= 0;
-                abbrT = format.indexOf('aT') >= 0;
-                abbrForce = abbrK || abbrM || abbrB || abbrT;
+        // see if we should use parentheses for negative number or if we should prefix with a sign
+        // if both are present we default to parentheses
+        if (format.indexOf('-') !== -1) {
+            forcedNeg = true;
+        }
+        if (format.indexOf('(') > -1) {
+            negP = true;
+            format = format.slice(1, -1);
+        } else if (format.indexOf('+') > -1) {
+            signed = true;
+            format = format.replace(/\+/g, '');
+        }
 
-                // check for space before abbreviation
-                if (format.indexOf(' a') > -1) {
-                    abbr = ' ';
-                    format = format.replace(' a', '');
-                } else {
-                    format = format.replace('a', '');
-                }
+        // see if abbreviation is wanted
+        if (format.indexOf('a') > -1) {
+            intPrecision = format.split('.')[0].match(/[0-9]+/g) || ['0'];
+            intPrecision = parseInt(intPrecision[0], 10);
 
-                totalLength = Math.floor(Math.log(abs) / Math.LN10) + 1;
+            // check if abbreviation is specified
+            abbrK = format.indexOf('aK') >= 0;
+            abbrM = format.indexOf('aM') >= 0;
+            abbrB = format.indexOf('aB') >= 0;
+            abbrT = format.indexOf('aT') >= 0;
+            abbrForce = abbrK || abbrM || abbrB || abbrT;
 
-                minimumPrecision = totalLength % 3;
-                minimumPrecision = minimumPrecision === 0 ? 3 : minimumPrecision;
-
-                if(intPrecision) {
-
-                    length = Math.floor(Math.log(abs) / Math.LN10) + 1 - intPrecision;
-
-                    pow = 3 * ~~((Math.min(intPrecision, totalLength) - minimumPrecision) / 3);
-
-                    abs = abs / Math.pow(10, pow);
-
-                    if (format.indexOf('.') === -1 && intPrecision > 3) {
-                        format += '[.]';
-
-                        size = length === 0 ? 0 : 3 * ~~(length / 3) - length;
-                        size = size < 0 ? size + 3 : size;
-
-                        for (i = 0; i < size; i++) {
-                            format += '0';
-                        }
-                    }
-                }
-
-                if (Math.floor(Math.log(Math.abs(value)) / Math.LN10) + 1 !== intPrecision){
-                    if (abs >= Math.pow(10, 12) && !abbrForce || abbrT) {
-                        // trillion
-                        abbr = abbr + languages[currentLanguage].abbreviations.trillion;
-                        value = value / Math.pow(10, 12);
-                    } else if (abs < Math.pow(10, 12) && abs >= Math.pow(10, 9) && !abbrForce || abbrB) {
-                        // billion
-                        abbr = abbr + languages[currentLanguage].abbreviations.billion;
-                        value = value / Math.pow(10, 9);
-                    } else if (abs < Math.pow(10, 9) && abs >= Math.pow(10, 6) && !abbrForce || abbrM) {
-                        // million
-                        abbr = abbr + languages[currentLanguage].abbreviations.million;
-                        value = value / Math.pow(10, 6);
-                    } else if (abs < Math.pow(10, 6) && abs >= Math.pow(10, 3) && !abbrForce || abbrK) {
-                        // thousand
-                        abbr = abbr + languages[currentLanguage].abbreviations.thousand;
-                        value = value / Math.pow(10, 3);
-                    }
-                }
+            // check for space before abbreviation
+            if (format.indexOf(' a') > -1) {
+                abbr = ' ';
+                format = format.replace(' a', '');
+            } else {
+                format = format.replace('a', '');
             }
 
-            // see if we are formatting binary bytes
-            if (format.indexOf('b') > -1) {
-                // check for space before
-                if (format.indexOf(' b') > -1) {
-                    bytes = ' ';
-                    format = format.replace(' b', '');
-                } else {
-                    format = format.replace('b', '');
-                }
+            totalLength = Math.floor(Math.log(abs) / Math.LN10) + 1;
 
-                for (power = 0; power <= binarySuffixes.length; power++) {
-                    min = Math.pow(1024, power);
-                    max = Math.pow(1024, power + 1);
+            minimumPrecision = totalLength % 3;
+            minimumPrecision = minimumPrecision === 0 ? 3 : minimumPrecision;
 
-                    if (value >= min && value < max) {
-                        bytes = bytes + binarySuffixes[power];
-                        if (min > 0) {
-                            value = value / min;
-                        }
-                        break;
+            if (intPrecision && abs !== 0) {
+
+                length = Math.floor(Math.log(abs) / Math.LN10) + 1 - intPrecision;
+
+                pow = 3 * ~~((Math.min(intPrecision, totalLength) - minimumPrecision) / 3);
+
+                abs = abs / Math.pow(10, pow);
+
+                if (format.indexOf('.') === -1 && intPrecision > 3) {
+                    format += '[.]';
+
+                    size = length === 0 ? 0 : 3 * ~~(length / 3) - length;
+                    size = size < 0 ? size + 3 : size;
+
+                    for (i = 0; i < size; i++) {
+                        format += '0';
                     }
                 }
             }
 
-            // see if we are formatting decimal bytes
-            if (format.indexOf('d') > -1) {
-                // check for space before
-                if (format.indexOf(' d') > -1) {
-                    bytes = ' ';
-                    format = format.replace(' d', '');
-                } else {
-                    format = format.replace('d', '');
+            if (Math.floor(Math.log(Math.abs(value)) / Math.LN10) + 1 !== intPrecision) {
+                if (abs >= Math.pow(10, 12) && !abbrForce || abbrT) {
+                    // trillion
+                    abbr = abbr + cultures[currentCulture].abbreviations.trillion;
+                    value = value / Math.pow(10, 12);
+                } else if (abs < Math.pow(10, 12) && abs >= Math.pow(10, 9) && !abbrForce || abbrB) {
+                    // billion
+                    abbr = abbr + cultures[currentCulture].abbreviations.billion;
+                    value = value / Math.pow(10, 9);
+                } else if (abs < Math.pow(10, 9) && abs >= Math.pow(10, 6) && !abbrForce || abbrM) {
+                    // million
+                    abbr = abbr + cultures[currentCulture].abbreviations.million;
+                    value = value / Math.pow(10, 6);
+                } else if (abs < Math.pow(10, 6) && abs >= Math.pow(10, 3) && !abbrForce || abbrK) {
+                    // thousand
+                    abbr = abbr + cultures[currentCulture].abbreviations.thousand;
+                    value = value / Math.pow(10, 3);
                 }
+            }
+        }
 
-                for (power = 0; power <= decimalSuffixes.length; power++) {
-                    min = Math.pow(1000, power);
-                    max = Math.pow(1000, power + 1);
+        // see if we are formatting binary bytes
+        if (format.indexOf('b') > -1) {
+            // check for space before
+            if (format.indexOf(' b') > -1) {
+                bytes = ' ';
+                format = format.replace(' b', '');
+            } else {
+                format = format.replace('b', '');
+            }
 
-                    if (value >= min && value < max) {
-                        bytes = bytes + decimalSuffixes[power];
-                        if (min > 0) {
-                            value = value / min;
-                        }
-                        break;
+            for (power = 0; power <= binarySuffixes.length; power++) {
+                min = Math.pow(1024, power);
+                max = Math.pow(1024, power + 1);
+
+                if (value >= min && value < max) {
+                    bytes = bytes + binarySuffixes[power];
+                    if (min > 0) {
+                        value = value / min;
                     }
+                    break;
                 }
             }
+        }
 
-            // see if ordinal is wanted
-            if (format.indexOf('o') > -1) {
-                // check for space before
-                if (format.indexOf(' o') > -1) {
-                    ord = ' ';
-                    format = format.replace(' o', '');
-                } else {
-                    format = format.replace('o', '');
-                }
-
-                if (languages[currentLanguage].ordinal){
-                    ord = ord + languages[currentLanguage].ordinal(value);
-                }
+        // see if we are formatting decimal bytes
+        if (format.indexOf('d') > -1) {
+            // check for space before
+            if (format.indexOf(' d') > -1) {
+                bytes = ' ';
+                format = format.replace(' d', '');
+            } else {
+                format = format.replace('d', '');
             }
 
-            if (format.indexOf('[.]') > -1) {
-                optDec = true;
-                format = format.replace('[.]', '.');
+            for (power = 0; power <= decimalSuffixes.length; power++) {
+                min = Math.pow(1000, power);
+                max = Math.pow(1000, power + 1);
+
+                if (value >= min && value < max) {
+                    bytes = bytes + decimalSuffixes[power];
+                    if (min > 0) {
+                        value = value / min;
+                    }
+                    break;
+                }
+            }
+        }
+
+        // see if ordinal is wanted
+        if (format.indexOf('o') > -1) {
+            // check for space before
+            if (format.indexOf(' o') > -1) {
+                ord = ' ';
+                format = format.replace(' o', '');
+            } else {
+                format = format.replace('o', '');
             }
 
-            w = value.toString().split('.')[0];
-            precision = format.split('.')[1];
-            thousands = format.indexOf(',');
+            if (cultures[currentCulture].ordinal) {
+                ord = ord + cultures[currentCulture].ordinal(value);
+            }
+        }
 
-            if (precision) {
+        if (format.indexOf('[.]') > -1) {
+            optDec = true;
+            format = format.replace('[.]', '.');
+        }
+
+        w = value.toString().split('.')[0];
+        precision = format.split('.')[1];
+        thousands = format.indexOf(',');
+
+        if (precision) {
+            if (precision.indexOf('*') !== -1) {
+                d = toFixed(value, value.toString().split('.')[1].length, roundingFunction);
+            } else {
                 if (precision.indexOf('[') > -1) {
                     precision = precision.replace(']', '');
                     precision = precision.split('[');
                     d = toFixed(value, (precision[0].length + precision[1].length), roundingFunction,
-                            precision[1].length);
+                        precision[1].length);
                 } else {
                     d = toFixed(value, precision.length, roundingFunction);
                 }
+            }
 
-                w = d.split('.')[0];
+            w = d.split('.')[0];
 
-                if (d.split('.')[1].length) {
-                    prefix = sep ? abbr + sep : languages[currentLanguage].delimiters.decimal;
-                    d = prefix + d.split('.')[1];
-                } else {
-                    d = '';
-                }
-
-                if (optDec && Number(d.slice(1)) === 0) {
-                    d = '';
-                }
+            if (d.split('.')[1].length) {
+                var p = sep ? abbr + sep : cultures[currentCulture].delimiters.decimal;
+                d = p + d.split('.')[1];
             } else {
-                w = toFixed(value, null, roundingFunction);
+                d = '';
             }
 
-            // format number
-            if (w.indexOf('-') > -1) {
-                w = w.slice(1);
-                neg = true;
+            if (optDec && Number(d.slice(1)) === 0) {
+                d = '';
             }
-
-            if (thousands > -1) {
-                w = w.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1' +
-                    languages[currentLanguage].delimiters.thousands);
-            }
-
-            if (format.indexOf('.') === 0) {
-                w = '';
-            }
-
-            indexOpenP = format.indexOf('(');
-            indexMinus = format.indexOf('-');
-
-            if(indexOpenP < indexMinus) {
-                paren = ((negP && neg) ? '(' : '') + (((forcedNeg && neg) || (!negP && neg)) ? '-' : '');
-            } else {
-                paren = (((forcedNeg && neg) || (!negP && neg)) ? '-' : '') + ((negP && neg) ? '(' : '');
-            }
-
-
-            return paren + ((!neg && signed && value !== 0) ? '+' : '') +
-                w + d +
-                ((ord) ? ord : '') +
-                ((abbr && !sep) ? abbr : '') +
-                ((bytes) ? bytes : '') +
-                ((negP && neg) ? ')' : '');
+        } else {
+            w = toFixed(value, 0, roundingFunction);
         }
+
+        // format number
+        if (w.indexOf('-') > -1) {
+            w = w.slice(1);
+            neg = true;
+        }
+
+        if (w.length < minlen) {
+            w = new Array(minlen - w.length + 1).join('0') + w;
+        }
+
+        if (thousands > -1) {
+            w = w.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1' +
+                cultures[currentCulture].delimiters.thousands);
+        }
+
+        if (format.indexOf('.') === 0) {
+            w = '';
+        }
+
+        indexOpenP = format.indexOf('(');
+        indexMinus = format.indexOf('-');
+
+        if (indexOpenP < indexMinus) {
+            paren = ((negP && neg) ? '(' : '') + (((forcedNeg && neg) || (!negP && neg)) ? '-' : '');
+        } else {
+            paren = (((forcedNeg && neg) || (!negP && neg)) ? '-' : '') + ((negP && neg) ? '(' : '');
+        }
+
+        return prefix +
+            paren + ((!neg && signed && value !== 0) ? '+' : '') +
+            w + d +
+            ((ord) ? ord : '') +
+            ((abbr && !sep) ? abbr : '') +
+            ((bytes) ? bytes : '') +
+            ((negP && neg) ? ')' : '') +
+            postfix;
     }
 
     /************************************
@@ -569,59 +689,119 @@
         return obj instanceof Numbro;
     };
 
-    // This function will load languages and then set the global language.  If
-    // no arguments are passed in, it will simply return the current global
-    // language key.
+    /**
+     * This function allow the user to set a new language with a fallback if
+     * the language does not exist. If no fallback language is provided,
+     * it fallbacks to english.
+     *
+     * @deprecated Since in version 1.6.0. It will be deleted in version 2.0
+     * `setCulture` should be used instead.
+     */
+    numbro.setLanguage = function(newLanguage, fallbackLanguage) {
+        console.warn('`setLanguage` is deprecated since version 1.6.0. Use `setCulture` instead');
+        var key = newLanguage,
+            prefix = newLanguage.split('-')[0],
+            matchingLanguage = null;
+        if (!languages[key]) {
+            Object.keys(languages).forEach(function(language) {
+                if (!matchingLanguage && language.split('-')[0] === prefix) {
+                    matchingLanguage = language;
+                }
+            });
+            key = matchingLanguage || fallbackLanguage || 'en-US';
+        }
+        chooseCulture(key);
+    };
+
+    /**
+     * This function allow the user to set a new culture with a fallback if
+     * the culture does not exist. If no fallback culture is provided,
+     * it fallbacks to "en-US".
+     */
+    numbro.setCulture = function(newCulture, fallbackCulture) {
+        var key = newCulture,
+            suffix = newCulture.split('-')[1],
+            matchingCulture = null;
+        if (!cultures[key]) {
+            if (suffix) {
+                Object.keys(cultures).forEach(function(language) {
+                    if (!matchingCulture && language.split('-')[1] === suffix) {
+                        matchingCulture = language;
+                    }
+                });
+            }
+
+            key = matchingCulture || fallbackCulture || 'en-US';
+        }
+        chooseCulture(key);
+    };
+
+    /**
+     * This function will load languages and then set the global language.  If
+     * no arguments are passed in, it will simply return the current global
+     * language key.
+     *
+     * @deprecated Since in version 1.6.0. It will be deleted in version 2.0
+     * `culture` should be used instead.
+     */
     numbro.language = function(key, values) {
+        console.warn('`language` is deprecated since version 1.6.0. Use `culture` instead');
+
         if (!key) {
-            return currentLanguage;
+            return currentCulture;
         }
 
         if (key && !values) {
             if (!languages[key]) {
                 throw new Error('Unknown language : ' + key);
             }
-            currentLanguage = key;
-            var defaults = languages[key].defaults;
-            if(defaults && defaults.format){
-                numbro.defaultFormat(defaults.format);
-            }
-            if(defaults && defaults.currencyFormat){
-                numbro.defaultCurrencyFormat(defaults.currencyFormat);
-            }
+            chooseCulture(key);
         }
 
         if (values || !languages[key]) {
-            loadLanguage(key, values);
+            setCulture(key, values);
         }
 
         return numbro;
     };
 
-    // This function allow the user to set a new language with a fallback if
-    // the language does not exist. If no fallback language is provided,
-    // it fallbacks to english.
-    numbro.setLanguage = function(newLanguage, fallbackLanguage) {
-        var key = newLanguage,
-            prefix = newLanguage.split('-')[0],
-            matchingLanguage = null;
-        if (!languages[key]) {
-            Object.keys(languages).forEach(function(language) {
-                if (!matchingLanguage && language.split('-')[0] === prefix){
-                    matchingLanguage = language;
-                }
-            });
-            key = matchingLanguage || fallbackLanguage || 'en-US';
+    /**
+     * This function will load cultures and then set the global culture.  If
+     * no arguments are passed in, it will simply return the current global
+     * culture code.
+     */
+    numbro.culture = function(code, values) {
+        if (!code) {
+            return currentCulture;
         }
-        numbro.language(key);
+
+        if (code && !values) {
+            if (!cultures[code]) {
+                throw new Error('Unknown culture : ' + code);
+            }
+            chooseCulture(code);
+        }
+
+        if (values || !cultures[code]) {
+            setCulture(code, values);
+        }
+
+        return numbro;
     };
 
-    // This function provides access to the loaded language data.  If
-    // no arguments are passed in, it will simply return the current
-    // global language object.
+    /**
+     * This function provides access to the loaded language data.  If
+     * no arguments are passed in, it will simply return the current
+     * global language object.
+     *
+     * @deprecated Since in version 1.6.0. It will be deleted in version 2.0
+     * `culture` should be used instead.
+     */
     numbro.languageData = function(key) {
+        console.warn('`languageData` is deprecated since version 1.6.0. Use `cultureData` instead');
+
         if (!key) {
-            return languages[currentLanguage];
+            return languages[currentCulture];
         }
 
         if (!languages[key]) {
@@ -631,40 +811,37 @@
         return languages[key];
     };
 
-    numbro.language('en-US', {
-        delimiters: {
-            thousands: ',',
-            decimal: '.'
-        },
-        abbreviations: {
-            thousand: 'k',
-            million: 'm',
-            billion: 'b',
-            trillion: 't'
-        },
-        ordinal: function(number) {
-            var b = number % 10;
-            return (~~(number % 100 / 10) === 1) ? 'th' :
-                (b === 1) ? 'st' :
-                (b === 2) ? 'nd' :
-                (b === 3) ? 'rd' : 'th';
-        },
-        currency: {
-            symbol: '$',
-            position: 'prefix'
-        },
-        defaults: {
-            currencyFormat: ',0000 a'
-        },
-        formats: {
-            fourDigits: '0000 a',
-            fullWithTwoDecimals: '$ ,0.00',
-            fullWithTwoDecimalsNoCurrency: ',0.00'
+    /**
+     * This function provides access to the loaded culture data.  If
+     * no arguments are passed in, it will simply return the current
+     * global culture object.
+     */
+    numbro.cultureData = function(code) {
+        if (!code) {
+            return cultures[currentCulture];
         }
-    });
 
+        if (!cultures[code]) {
+            throw new Error('Unknown culture : ' + code);
+        }
+
+        return cultures[code];
+    };
+
+    numbro.culture('en-US', enUS);
+
+    /**
+     * @deprecated Since in version 1.6.0. It will be deleted in version 2.0
+     * `cultures` should be used instead.
+     */
     numbro.languages = function() {
+        console.warn('`languages` is deprecated since version 1.6.0. Use `cultures` instead');
+
         return languages;
+    };
+
+    numbro.cultures = function() {
+        return cultures;
     };
 
     numbro.zeroFormat = function(format) {
@@ -687,7 +864,7 @@
             _valArray,
             _abbrObj,
             _thousandRegEx,
-            languageData,
+            cultureData,
             temp;
 
         //coerce val to string
@@ -711,22 +888,22 @@
             return false;
         }
 
-        //get the decimal and thousands separator from numbro.languageData
+        //get the decimal and thousands separator from numbro.cultureData
         try {
-            //check if the culture is understood by numbro. if not, default it to current language
-            languageData = numbro.languageData(culture);
+            //check if the culture is understood by numbro. if not, default it to current culture
+            cultureData = numbro.cultureData(culture);
         } catch (e) {
-            languageData = numbro.languageData(numbro.language());
+            cultureData = numbro.cultureData(numbro.culture());
         }
 
-        //setup the delimiters and currency symbol based on culture/language
-        _currSymbol = languageData.currency.symbol;
-        _abbrObj = languageData.abbreviations;
-        _decimalSep = languageData.delimiters.decimal;
-        if (languageData.delimiters.thousands === '.') {
+        //setup the delimiters and currency symbol based on culture
+        _currSymbol = cultureData.currency.symbol;
+        _abbrObj = cultureData.abbreviations;
+        _decimalSep = cultureData.delimiters.decimal;
+        if (cultureData.delimiters.thousands === '.') {
             _thousandSep = '\\.';
         } else {
-            _thousandSep = languageData.delimiters.thousands;
+            _thousandSep = cultureData.delimiters.thousands;
         }
 
         // validating currency symbol
@@ -774,12 +951,74 @@
         return false;
     };
 
+    numbro.includeLocalesInNode = function(culturesPath, culture) {
+        if (!inNodejsRuntime()) {
+            return;
+        }
+
+        var path = require('path');
+
+        culture.forEach(function(langLocaleCode) {
+            var culture = require(path.join(__dirname, culturesPath, langLocaleCode));
+            numbro.culture(culture.langLocaleCode, culture);
+        });
+    };
+
+    /**
+     * * @deprecated Since in version 1.6.0. It will be deleted in version 2.0
+     * `loadCulturesInNode` should be used instead.
+     */
+    numbro.loadLanguagesInNode = function(languagesPath) {
+        console.warn('`loadLanguagesInNode` is deprecated since version 1.6.0. Use `loadCulturesInNode` instead');
+
+        if (!inNodejsRuntime()) {
+            return;
+        }
+
+        var fs = require('fs');
+        var path = require('path');
+
+        var langFiles = fs.readdirSync(path.join(__dirname, languagesPath));
+
+        numbro.includeLocalesInNode(languagesPath, langFiles);
+    };
+
+    numbro.loadCulturesInNode = function(culturesPath) {
+        if (!inNodejsRuntime()) {
+            return;
+        }
+
+        var fs = require('fs');
+        var path = require('path');
+
+        var langFiles = fs.readdirSync(path.join(__dirname, culturesPath));
+
+        numbro.includeLocalesInNode(culturesPath, langFiles);
+    };
+
     /************************************
         Helpers
     ************************************/
 
-    function loadLanguage(key, values) {
-        languages[key] = values;
+    function setCulture(code, values) {
+        cultures[code] = values;
+    }
+
+    function chooseCulture(code) {
+        currentCulture = code;
+        var defaults = cultures[code].defaults;
+        if (defaults && defaults.format) {
+            numbro.defaultFormat(defaults.format);
+        }
+        if (defaults && defaults.currencyFormat) {
+            numbro.defaultCurrencyFormat(defaults.currencyFormat);
+        }
+    }
+
+    function inNodejsRuntime() {
+        return (typeof process !== 'undefined') &&
+            (process.browser === undefined) &&
+            (process.title === 'node' || process.title === 'grunt');
     }
 
     /************************************
@@ -863,7 +1102,6 @@
             return mp > mn ? mp : mn;
         }, -Infinity);
     }
-
 
     /************************************
         Numbro Prototype
@@ -964,15 +1202,10 @@
     // CommonJS module is defined
     if (hasModule) {
         module.exports = numbro;
-
-        // Load all languages
-        var fs = require('fs'),
-            path = require('path');
-        var langFiles = fs.readdirSync(path.join(__dirname, 'languages'));
-        langFiles.forEach(function (langFile) {
-            numbro.language(path.basename(langFile, '.js'), require(path.join(__dirname, 'languages', langFile)));
-        });
     }
+
+    //Todo: Rename the folder in 2.0.0
+    numbro.loadCulturesInNode('languages');
 
     /*global ender:false */
     if (typeof ender === 'undefined') {
@@ -996,4 +1229,5 @@
             return numbro;
         });
     }
+
 }.call(typeof window === 'undefined' ? this : window));

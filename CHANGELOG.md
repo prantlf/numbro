@@ -1,3 +1,41 @@
+### 1.6.2
+
+- Fix deprecated use of `language` and introduce `cultureCode`. Thanks @BenjaminVanRyseghem
+
+### 1.6.1
+
+- Fix languages to use proper intPrecision. Thanks @BenjaminVanRyseghem
+- Fix `intPrecision` when value is 0. Thanks @BenjaminVanRyseghem
+
+### 1.6.0
+
+- Introduce new API functions:
+
+	- setCulture
+	- culture
+	- cultureData
+	- cultures
+	
+- Deprecate API functions:
+
+	- setLanguage
+	- language
+	- languageData
+	- languages
+
+Those deprecated functions will be removed in version 2.0.0
+
+### 1.5.2
+
+- Fixed scoping issue. Thanks @tuimz
+- #68 Format decimal numbers. Thanks @BenjaminVanRyseghem
+- #70 v1.5.0 error with browserify. Thanks @BenjaminVanRyseghem
+- #71 Incorrectly reporting hasModule = true. Thanks @BenjaminVanRyseghem
+- #72 the currency symbol is $ which is a currency symbol already by itself (the dollar..). Thanks @BenjaminVanRyseghem
+- #76 ability to "pad" a number in formatting. Thanks @BenjaminVanRyseghem
+- #79 browserify attempts to load all language files. Thanks @BenjaminVanRyseghem
+- #106 Exception on large number formatting. Thanks @andrewla
+
 ### 1.5.1
  
 - #78 Why is 0 formatted as +0?. Thanks to @clayzermk1

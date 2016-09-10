@@ -216,7 +216,7 @@
     // revert to number
     function unformatNumbro(n, string) {
         var stringOriginal = string,
-            cultureConfig = languages[n._config.currentCulture || currentCulture],
+            cultureConfig = cultures[n._config.currentCulture || currentCulture],
             currentZeroFormat,
             thousandRegExp,
             millionRegExp,
@@ -282,7 +282,7 @@
 
     function formatCurrency(n, currencySymbol, originalFormat, roundingFunction) {
         var format = originalFormat,
-            cultureConfig = languages[n._config.currentCulture || currentCulture],
+            cultureConfig = cultures[n._config.currentCulture || currentCulture],
             symbolIndex = format.indexOf('$'),
             openParenIndex = format.indexOf('('),
             plusSignIndex = format.indexOf('+'),
@@ -294,7 +294,7 @@
 
         if(format.indexOf('$') === -1){
             // Use defaults instead of the format provided
-            if (cultures[currentCulture].currency.position === 'infix') {
+            if (cultureConfig.currency.position === 'infix') {
                 decimalSeparator = currencySymbol;
                 if (cultureConfig.currency.spaceSeparated) {
                     decimalSeparator = ' ' + decimalSeparator + ' ';
@@ -478,7 +478,7 @@
             units,
             ord = '',
             abs = Math.abs(value),
-            cultureConfig = languages[n._config.currentCulture || currentCulture],
+            cultureConfig = cultures[n._config.currentCulture || currentCulture],
             currentZeroFormat = n._config.zeroFormat || zeroFormat,
             totalLength,
             length,

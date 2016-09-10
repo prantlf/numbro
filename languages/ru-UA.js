@@ -9,6 +9,7 @@
 
     var language = {
         langLocaleCode: 'ru-UA',
+        cultureCode: 'ru-UA',
         delimiters: {
             thousands: ' ',
             decimal: ','
@@ -30,22 +31,22 @@
             position: 'postfix'
         },
         defaults: {
-            currencyFormat: ',0000 a'
+            currencyFormat: ',4 a'
         },
         formats: {
-            fourDigits: '0000 a',
+            fourDigits: '4 a',
             fullWithTwoDecimals: ',0.00 $',
             fullWithTwoDecimalsNoCurrency: ',0.00',
             fullWithNoDecimals: ',0 $'
         }
     };
 
-    // Node
+    // CommonJS
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = language;
     }
     // Browser
-    if (typeof window !== 'undefined' && window.numbro && window.numbro.language) {
-        window.numbro.language(language.langLocaleCode, language);
+    if (typeof window !== 'undefined' && window.numbro && window.numbro.culture) {
+        window.numbro.culture(language.cultureCode, language);
     }
 }.call(typeof window === 'undefined' ? this : window));

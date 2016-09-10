@@ -48,6 +48,27 @@ exports.clone = {
         test.done();
     },
 
+    // Check that the clone culture method applies only to the clone
+    culture: function (test) {
+        test.expect(6);
+
+        var n = numbro.clone();
+        n.culture('test-TEST');
+        test.strictEqual(n.culture(), 'test-TEST', 'clone');
+        n.setCulture('test');
+        test.strictEqual(n.culture(), 'test-TEST', 'clone prefix');
+
+        var i = n();
+        test.strictEqual(i.culture(), 'test-TEST', 'instance');
+        n.setCulture('en-US');
+        test.strictEqual(n.culture(), 'en-US', 'clone changed');
+        test.strictEqual(i.culture(), 'test-TEST', 'instance unchanged');
+
+        test.strictEqual(numbro.culture(), 'en-US', 'global');
+
+        test.done();
+    },
+
     // Check that the clone zeroFormat method applies only to the clone
     zeroFormat: function (test) {
         test.expect(4);
@@ -58,7 +79,7 @@ exports.clone = {
         test.strictEqual(n(0).formatCurrency(), '$nothing', 'clone currency');
 
         test.strictEqual(numbro(0).format(), '0', 'global');
-        test.strictEqual(numbro(0).formatCurrency(), '$0 ', 'global currency');
+        test.strictEqual(numbro(0).formatCurrency(), '$0,000 ', 'global currency');
 
         test.done();
     },
@@ -84,7 +105,7 @@ exports.clone = {
         n.defaultCurrencyFormat('0.0[0000] $');
         test.strictEqual(n(1234.56).formatCurrency(), '1234.56 $', 'clone');
 
-        test.strictEqual(numbro(1234.56).formatCurrency(), '$1 k', 'global');
+        test.strictEqual(numbro(1234.56).formatCurrency(), '$0,001 k', 'global');
 
         test.done();
     }

@@ -2,8 +2,8 @@
 
 var numbro = require('../../numbro');
 
-// Register a testing language
-numbro.language('test-TEST', {
+// Register a testing culture
+numbro.culture('test-TEST', {
     delimiters: {
         thousands: ',',
         decimal: '.'

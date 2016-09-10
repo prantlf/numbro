@@ -1,17 +1,17 @@
 /*!
  * numbro.js language configuration
- * language : German
- * locale: Switzerland
- * author : Michael Piefel : https://github.com/piefel (based on work from Marco Krage : https://github.com/sinky)
+ * language : English
+ * locale: Australia
+ * author : Benedikt Huss : https://github.com/ben305
  */
 (function () {
     'use strict';
 
     var language = {
-        langLocaleCode: 'de-CH',
-        cultureCode: 'de-CH',
+        langLocaleCode: 'en-AU',
+        cultureCode: 'en-AU',
         delimiters: {
-            thousands: '\'',
+            thousands: ',',
             decimal: '.'
         },
         abbreviations: {
@@ -20,21 +20,25 @@
             billion: 'b',
             trillion: 't'
         },
-        ordinal: function () {
-            return '.';
+        ordinal: function (number) {
+            var b = number % 10;
+            return (~~ (number % 100 / 10) === 1) ? 'th' :
+                (b === 1) ? 'st' :
+                (b === 2) ? 'nd' :
+                (b === 3) ? 'rd' : 'th';
         },
         currency: {
-            symbol: 'CHF',
-            position: 'postfix'
+            symbol: '$',
+            position: 'prefix'
         },
         defaults: {
             currencyFormat: ',4 a'
         },
         formats: {
             fourDigits: '4 a',
-            fullWithTwoDecimals: ',0.00 $',
+            fullWithTwoDecimals: '$ ,0.00',
             fullWithTwoDecimalsNoCurrency: ',0.00',
-            fullWithNoDecimals: ',0 $'
+            fullWithNoDecimals: '$ ,0'
         }
     };
 

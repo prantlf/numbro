@@ -1,3 +1,57 @@
+### 1.9.3
+
+- Fix #184: Accurate, up-to-date type definitions for TypeScript. Thanks @dpoggi.
+- Fix #196: Fix german language specifications. Thanks @Ben305.
+- Fix #197: Add detection for Meteor. Thanks @Ben305.
+- Fix #206: fix number formats for de-CH. Thanks @Remo.
+
+### 1.9.2
+
+- Fix #195: Fixed wrong results from formatForeignCurrency. Thanks @Ben305.
+
+### 1.9.1
+
+- Add forgotten files
+
+### 1.9.0
+
+- Fix #192: Add locales en-AU and en-NZ. Thanks @Ben305.
+- Fix #193: Add function formatForeignCurrency. Thanks @Ben305.
+- Fix #194: Fix undefined error on React native. Thanks @abalhier.
+
+### 1.8.1
+
+- Fix #182: Added support for numbers without leading zero. Thanks @budnix.
+- Fix #183: Number validation doesn't validate negative numbers. Thanks @budnix.
+
+### 1.8.0
+
+- Fix #180: Add culture function, deprecate language. Thanks @wereHamster.
+- Fix #170: Add the ability to determine units without formatting. Thanks @pickypg.
+- Fix #162: Add TypeScript declaration file. Thanks @wereHamster.
+- Fix #163: unformat: return undefined when value can't be parsed. Thanks @wereHamster.
+- Fix #173: Added two latest stable node versions to Travis build. Thanks @therebelrobot.
+- Fix #176: default pt-BR currency is prefix, not postfix. Thanks @luisrudge.
+- Fix #175: Zero byte unit fix, take 2. Thanks @therebelrobot.
+- Fix #135: Fix fr-CA currency format. Thanks @killfish.
+- Fix #174: Set versions for all deps. Thanks @BenjaminVanRyseghem.
+- Fix #152: Use zeros() function instead of multiple inline implementations. Thanks @MarkHerhold.
+
+### 1.7.1
+
+- Fix #142: Limit packaging extraneous files. Thanks @MarkHerhold.
+- Fix #143: Fixing web build. Thanks @mmollick.
+- Fix #149: Allow loading of cultures in node explicitly if numbro hasn't detected correctly that it is in node. Thanks @stewart42.
+- Fix #147: Fixing formatting issues for very small (+/-1e-23) numbers. Thanks @MarkHerhold.
+
+### 1.7.0
+
+- Fix decimal rounding issue. Thangrks @Shraymonks.
+- Fix #114: webpack bundling. Thanks @mmollick.
+- Add ko-KR & zh-TW support. Thanks @rocketedaway and @rWilander.
+- Add existence check for require. Thanks @jamiter.
+- Improve verbatim feature. Thanks @jneill.
+
 ### 1.6.2
 
 - Fix deprecated use of `language` and introduce `cultureCode`. Thanks @BenjaminVanRyseghem
